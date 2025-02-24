@@ -83,6 +83,11 @@ def CKA_derivative(X, Y):
     :param X: torch.Tensor of shape (n, d)
     :param Y: torch.Tensor of shape (n, d)
     """
+    if type(X) is not torch.Tensor:
+        X = torch.tensor(X, dtype=torch.float32)
+    if type(Y) is not torch.Tensor:
+        Y = torch.tensor(Y, dtype=X.dtype)
+
     # Compute the Gram matrices
     K = gram_linear(X)
     L = gram_linear(Y)
@@ -92,12 +97,13 @@ def CKA_derivative(X, Y):
     # Compute the centering matrix
     n = X.shape[0]
 
-    derivative = 2 * L @ X / (torch.trace(K @ K)).sqrt() - 2 * torch.trace(
-        K @ L
-    ) * K @ X / (torch.trace(K @ K) ** 1.5)
-    derivative = derivative / (torch.trace(L @ L)).sqrt()
+    alpha = 2 / (torch.trace(L @ L)).sqrt()
+    ld = alpha * L @ X / torch.trace(K @ K).sqrt()
+    rd = alpha * torch.trace(K @ L) * K @ X / (torch.trace(K @ K) ** 1.5)
 
-    return derivative
+    derivative = ld - rd
+
+    return derivative, (ld, rd)
 
 
 if __name__ == "__main__":
