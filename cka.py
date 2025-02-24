@@ -117,7 +117,7 @@ if __name__ == "__main__":
     print(CKA(X, Y))
     print(CKA_2(X, Y))
 
-    derivative = CKA_derivative(X, Y)
+    derivative, _ = CKA_derivative(X, Y)
 
     cka = CKA(X, Y)
     cka.backward()

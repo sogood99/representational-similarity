@@ -55,13 +55,14 @@ if __name__ == "__main__":
             _, (ld, rd) = CKA_derivative(Z, y)
 
             ld, rd = ld.cpu().numpy(), rd.cpu().numpy()
-            Z += rd
+            Z -= rd
         else:
             plt.title(f"Frame {frame}: Right Derivative")
 
             Z += ld
 
-        quiver.set_offsets(Z)
+        # quiver.set_offsets(Z)
+        quiver.set_UVC(Z[:, 0], Z[:, 1])
 
     # show axes
     ax.axhline(0, color="black", linewidth=0.5)
@@ -69,5 +70,5 @@ if __name__ == "__main__":
     # show the grid
     ax.grid(color="gray", linestyle="--", linewidth=0.5)
 
-    ani = animation.FuncAnimation(fig, update, frames=range(20), interval=1000)
+    ani = animation.FuncAnimation(fig, update, frames=range(20), interval=100)
     plt.show()
