@@ -76,7 +76,7 @@ def CKA_2(X, Y):
     return frobenius_norm_G**2 / (frobenius_norm_K * frobenius_norm_L)
 
 
-def CKA_derivative(X, Y):
+def CKA_derivative(X, Y, P):
     """
     Compute the derivative of CKA with respect to X
 
@@ -87,6 +87,8 @@ def CKA_derivative(X, Y):
         X = torch.tensor(X, dtype=torch.float32)
     if type(Y) is not torch.Tensor:
         Y = torch.tensor(Y, dtype=X.dtype)
+    if type(P) is not torch.Tensor:
+        P = torch.tensor(P, dtype=X.dtype)
 
     # Compute the Gram matrices
     K = gram_linear(X)
@@ -98,7 +100,7 @@ def CKA_derivative(X, Y):
     n = X.shape[0]
 
     alpha = 2 / (torch.trace(L @ L)).sqrt()
-    ld = alpha * L @ X / torch.trace(K @ K).sqrt()
+    ld = alpha * P @ Y.T @ X / torch.trace(K @ K).sqrt()
     rd = alpha * torch.trace(K @ L) * K @ X / (torch.trace(K @ K) ** 1.5)
 
     derivative = ld - rd
