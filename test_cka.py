@@ -2,8 +2,6 @@
 Testing the CKA data on a simple example
 """
 
-import torch
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
@@ -11,8 +9,9 @@ import matplotlib.animation as animation
 
 from sklearn.linear_model import LogisticRegression
 
+import torch
 
-from src.cka import CKA, CKA_derivative
+from cka import CKA, CKA_derivative
 
 
 def center(Z):
