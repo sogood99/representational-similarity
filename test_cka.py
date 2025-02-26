@@ -31,8 +31,6 @@ if __name__ == "__main__":
     y_o = y
     # one hot encoding
     y = np.eye(np.max(y) + 1)[y]
-    # info = 0.1
-    # p = np.ones_like(y) / 2 * (1 - info) + y * info
 
     ## Attn(keys = W_x, queries = X, values = Y.T @ mx)
 

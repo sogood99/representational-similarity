@@ -63,8 +63,6 @@ def CKA_2(X, Y):
     :param X: torch.Tensor of shape (n, d)
     :param Y: torch.Tensor of shape (n, d)
     """
-    X = X - X.mean(dim=0)
-    Y = Y - Y.mean(dim=0)
     G = X.t() @ Y
     K = X.t() @ X
     L = Y.t() @ Y
@@ -76,31 +74,30 @@ def CKA_2(X, Y):
     return frobenius_norm_G**2 / (frobenius_norm_K * frobenius_norm_L)
 
 
-def CKA_derivative(X, Y, P):
+def CKA_derivative(X, Y, P=None):
     """
-    Compute the derivative of CKA with respect to X
+    Compute the derivative of CKA with respect to X, assume it is centered
 
     :param X: torch.Tensor of shape (n, d)
     :param Y: torch.Tensor of shape (n, d)
+    :param P: torch.Tensor of shape (d, d) or None
     """
     if type(X) is not torch.Tensor:
         X = torch.tensor(X, dtype=torch.float32)
     if type(Y) is not torch.Tensor:
         Y = torch.tensor(Y, dtype=X.dtype)
-    if type(P) is not torch.Tensor:
+    if type(P) is not torch.Tensor and P is not None:
         P = torch.tensor(P, dtype=X.dtype)
 
     # Compute the Gram matrices
     K = gram_linear(X)
     L = gram_linear(Y)
-    K = K - K.mean(dim=0)
-    L = L - L.mean(dim=0)
-
-    # Compute the centering matrix
-    n = X.shape[0]
 
     alpha = 2 / (torch.trace(L @ L)).sqrt()
-    ld = alpha * P @ Y.T @ X / torch.trace(K @ K).sqrt()
+    if P is None:
+        ld = alpha * Y @ Y.T @ X / torch.trace(K @ K).sqrt()
+    else:
+        ld = alpha * P @ X / torch.trace(K @ K).sqrt()
     rd = alpha * torch.trace(K @ L) * K @ X / (torch.trace(K @ K) ** 1.5)
 
     derivative = ld - rd
@@ -116,12 +113,15 @@ if __name__ == "__main__":
     X = torch.tensor(X, requires_grad=True)
     Y = torch.randn(n, d)
 
-    print(CKA(X, Y))
-    print(CKA_2(X, Y))
+    X_o = X - X.mean(dim=0)
+    Y_o = Y - Y.mean(dim=0)
 
-    derivative, _ = CKA_derivative(X, Y)
+    print(CKA(X_o, Y_o))
+    print(CKA_2(X_o, Y_o))
 
-    cka = CKA(X, Y)
+    derivative, _ = CKA_derivative(X_o, Y_o)
+
+    cka = CKA(X_o, Y_o)
     cka.backward()
 
     fig, axs = plt.subplots(1, 2)
