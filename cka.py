@@ -97,7 +97,7 @@ def CKA_derivative(X, Y, P=None):
     if P is None:
         ld = alpha * Y @ Y.T @ X / torch.trace(K @ K).sqrt()
     else:
-        ld = alpha * P @ X / torch.trace(K @ K).sqrt()
+        ld = alpha * P @ P.T @ X / torch.trace(K @ K).sqrt()
     rd = alpha * torch.trace(K @ L) * K @ X / (torch.trace(K @ K) ** 1.5)
 
     derivative = ld - rd

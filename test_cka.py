@@ -43,7 +43,16 @@ if __name__ == "__main__":
 
     ## Attn(keys = W_x, queries = X, values = Y.T @ mx)
 
-    clf = LogisticRegression(multi_class="multinomial")
+    # clf = LogisticRegression(multi_class="multinomial")
+    clf = torch.nn.Sequential(
+        torch.nn.Linear(d, 16),
+        torch.nn.ReLU(),
+        torch.nn.Linear(16, 16),
+        torch.nn.ReLU(),
+        torch.nn.Linear(16, classes),
+    )
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(clf.parameters(), lr=1e-3)
 
     colors = matplotlib.cm.get_cmap("tab10")
 
@@ -71,9 +80,10 @@ if __name__ == "__main__":
 
         elif frame % 3 == 1:
             plt.title(f"Frame {frame}: Left Derivative")
-            clf.fit(Z, y_o)
-            p = clf.predict_proba(Z)
-            _, (ld, rd) = CKA_derivative(Z, y, None)
+            # clf.fit(Z, y_o)
+            # p = clf.predict_proba(Z)
+            p = clf(torch.tensor(Z, dtype=torch.float32)).detach().numpy()
+            _, (ld, rd) = CKA_derivative(Z, y, p)
 
             ld, rd = ld.cpu().numpy(), rd.cpu().numpy()
             Z += lr * ld
@@ -91,6 +101,5 @@ if __name__ == "__main__":
     # show the grid
     ax.grid(color="gray", linestyle="--", linewidth=0.5)
 
-    ani = animation.FuncAnimation(fig, update, frames=200, interval=50)
-    # plt.show()
-    ani.save("cka_derivative.gif", writer="imagemagick", fps=20)
+    ani = animation.FuncAnimation(fig, update, frames=1000, interval=50)
+    plt.show()
