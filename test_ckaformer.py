@@ -2,6 +2,9 @@ from ckaformer import CKAFormer
 import torch
 from torch import nn
 import torchvision
+
+from torch.utils.tensorboard import SummaryWriter
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.cm
@@ -13,14 +16,14 @@ import numpy as np
 
 
 def test_ckaformer():
+    writer = SummaryWriter(log_dir="runs/ckaformer")
+
     fig, ax = plt.subplots()
 
-    n = 100
+    n = 500
     d = 784
     classes = 10
 
-    # X = torch.randn(n, d)
-    # X = X / X.norm(dim=-1, keepdim=True)
     dataset = torchvision.datasets.MNIST(
         root="./dataset",
         train=True,
@@ -28,10 +31,13 @@ def test_ckaformer():
         transform=torchvision.transforms.ToTensor(),
     )
     X = dataset.data[:n].view(n, -1).float()
-    X = X / X.norm(dim=-1, keepdim=True)
+    # X = X / X.norm(dim=-1, keepdim=True)
     y = dataset.targets[:n]
 
-    model = CKAFormer(dim=d, depth=500, out_dim=classes, y=y)
+    X_test = dataset.data[n : n + 100].view(100, -1).float()
+    y_test = dataset.targets[n : n + 100]
+
+    model = CKAFormer(dim=d, depth=500, out_dim=classes)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
@@ -74,15 +80,26 @@ def test_ckaformer():
         ani = animation.FuncAnimation(fig, update, frames=100, interval=100)
         plt.show()
     else:
-        for _ in range(100):
+        for epoch in range(100):
             optimizer.zero_grad()
             new_X, out = model(X)
             loss = criterion(out, y)
             loss.backward()
             optimizer.step()
             print(loss.item())
+            writer.add_scalar("Loss/train", loss.item(), epoch)
             with torch.no_grad():
-                print("Acc", (out.argmax(dim=-1) == y).float().mean().item())
+                acc = (out.argmax(dim=-1) == y).float().mean()
+                print("Acc", acc.item())
+                writer.add_scalar("Acc/train", acc, epoch)
+
+            if epoch % 10 == 0:
+                with torch.no_grad():
+                    new_X_test, out_test = model(X_test)
+                    loss_test = criterion(out_test, y_test)
+                    writer.add_scalar("Loss/test", loss_test, epoch)
+                    acc_test = (out_test.argmax(dim=-1) == y_test).float().mean()
+                    writer.add_scalar("Acc/test", acc_test, epoch)
 
 
 if __name__ == "__main__":
