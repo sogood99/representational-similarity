@@ -11,7 +11,7 @@ from sklearn.linear_model import LogisticRegression
 
 import torch
 
-from cka import CKA, CKA_derivative
+from cka import CKA_derivative
 
 
 def center(Z):
@@ -22,19 +22,28 @@ def center(Z):
 if __name__ == "__main__":
     fig, ax = plt.subplots()
 
-    origin = np.array([[0, 0, 0, 0], [0, 0, 0, 0]])
-    Z = np.array([[1, 0], [-1.3, 0], [0, 1.2], [0, -1]], dtype=np.float32)
+    n = 10
+    classes = 5
+    d = 2
+
+    # origin = np.array([[0, 0, 0, 0], [0, 0, 0, 0]])
+    np.random.seed(1234)
+    origin = np.zeros((2, n))
+    # Z = np.array([[1, 0], [-1.3, 0], [0, 1.2], [0, -1]], dtype=np.float32)
+    Z = np.random.randn(n, d)
     # center the data
     Z = center(Z)
     plt.title("Frame 0: Centering")
-    y = np.array([1, 1, 0, 0])
+    # y = np.array([1, 1, 0, 0])
+    y = np.random.randint(0, classes, n)
     y_o = y
     # one hot encoding
     y = np.eye(np.max(y) + 1)[y]
+    print(y.shape)
 
     ## Attn(keys = W_x, queries = X, values = Y.T @ mx)
 
-    lr = LogisticRegression(multi_class="multinomial")
+    clf = LogisticRegression(multi_class="multinomial")
 
     colors = matplotlib.cm.get_cmap("tab10")
 
@@ -47,13 +56,13 @@ if __name__ == "__main__":
         scale_units="xy",
         scale=1,
     )
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-2, 2)
-    # ax.set_xlim(-10, 10)
-    # ax.set_ylim(-10, 10)
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_ylim(-1.5, 1.5)
 
     def update(frame):
         global Z, rd
+
+        lr = max(0.2 - frame * 0.001, 0.0001)
 
         if frame % 3 == 0:
             # centering
@@ -62,16 +71,16 @@ if __name__ == "__main__":
 
         elif frame % 3 == 1:
             plt.title(f"Frame {frame}: Left Derivative")
-            lr.fit(Z, y_o)
-            p = lr.predict_proba(Z)
-            _, (ld, rd) = CKA_derivative(Z, y, p)
+            clf.fit(Z, y_o)
+            p = clf.predict_proba(Z)
+            _, (ld, rd) = CKA_derivative(Z, y, None)
 
             ld, rd = ld.cpu().numpy(), rd.cpu().numpy()
-            Z += 0.1 * ld
+            Z += lr * ld
         else:
             plt.title(f"Frame {frame}: Right Derivative")
 
-            Z -= 0.1 * rd
+            Z -= lr * rd
 
         # quiver.set_offsets(Z)
         quiver.set_UVC(Z[:, 0], Z[:, 1])
@@ -82,5 +91,6 @@ if __name__ == "__main__":
     # show the grid
     ax.grid(color="gray", linestyle="--", linewidth=0.5)
 
-    ani = animation.FuncAnimation(fig, update, frames=range(2000), interval=50)
-    plt.show()
+    ani = animation.FuncAnimation(fig, update, frames=200, interval=50)
+    # plt.show()
+    ani.save("cka_derivative.gif", writer="imagemagick", fps=20)
