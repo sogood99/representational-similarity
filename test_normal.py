@@ -1,4 +1,4 @@
-from ckaformer import LinearClassifier
+from ckaformer import FeedForwardClassifier
 from torch import nn
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -19,7 +19,7 @@ def test_normal():
     d = 784
     classes = 10
 
-    model = LinearClassifier(d, classes)
+    model = FeedForwardClassifier(d, classes)
 
     X = dataset.data[:n].view(n, -1).float()
     y = dataset.targets[:n]

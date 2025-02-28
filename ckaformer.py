@@ -14,10 +14,10 @@ class LayerNorm(nn.Module):
         super().__init__()
 
     def forward(self, X):
-        return (X) / (X.norm(dim=-1, keepdim=True))
+        return X / (X.norm(dim=-1, keepdim=True))
 
 
-class LinearClassifier(nn.Module):
+class FeedForwardClassifier(nn.Module):
     def __init__(self, dim, out_dim):
         super().__init__()
         self.linear = nn.Sequential(
@@ -49,7 +49,7 @@ class CompressionAnnilation(nn.Module):
 class CKAFormer(nn.Module):
     def __init__(self, dim, depth, out_dim):
         super().__init__()
-        self.lcls = LinearClassifier(dim, out_dim)
+        self.lcls = FeedForwardClassifier(dim, out_dim)
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(
