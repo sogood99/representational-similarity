@@ -102,7 +102,12 @@ def CKA_derivative(X, Y, P=None):
 
     derivative = ld - rd
 
-    return derivative, (ld, rd)
+    return derivative, {
+        "ld": ld,
+        "rd": rd,
+        "lc": (alpha / torch.trace(K @ K).sqrt()).item(),
+        "rc": (alpha / (torch.trace(L @ L)).sqrt()).item(),
+    }
 
 
 if __name__ == "__main__":

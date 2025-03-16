@@ -31,19 +31,21 @@ class FeedForwardClassifier(nn.Module):
 
 
 class CompressionAnnilation(nn.Module):
-    def __init__(self, lcls, gamma=1.0):
+    def __init__(self, lcls, layer=None, gamma=1e-4):
         super().__init__()
         self.lcls = lcls
         self.softmax = nn.Softmax(dim=-1)
         self.gamma = gamma
+        self.layer = layer
 
     def forward(self, X):
         P = self.lcls(X)
         P = self.softmax(P)
 
-        derivative, _ = CKA_derivative(X, P)
-        return X + self.gamma * derivative
-        # return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X
+        # derivative, props = CKA_derivative(X, P)
+        # return X + derivative, props
+        props = {"lc": self.gamma, "rc": self.gamma}
+        return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X, props
 
 
 class CKAFormer(nn.Module):
@@ -51,18 +53,23 @@ class CKAFormer(nn.Module):
         super().__init__()
         self.lcls = FeedForwardClassifier(dim, out_dim)
         self.layers = nn.ModuleList([])
-        for _ in range(depth):
+        for i in range(depth):
             self.layers.append(
                 nn.Sequential(
                     LayerNorm(),
                     CompressionAnnilation(
                         self.lcls,
-                        gamma=0.01,
+                        layer=i,
                     ),
                 )
             )
+        self.stats = {}
 
     def forward(self, X):
+        self.stats["lc"] = []
+        self.stats["rc"] = []
         for layer in self.layers:
-            X = layer(X)
-        return X, self.lcls(X)
+            X, prop = layer(X)
+            self.stats["lc"].append(prop["lc"])
+            self.stats["rc"].append(prop["rc"])
+        return self.lcls(X), self.stats
