@@ -30,7 +30,7 @@ class FeedForwardClassifier(nn.Module):
         return self.linear(X)
 
 
-class CompressionAnnilation(nn.Module):
+class Compression(nn.Module):
     def __init__(self, lcls, layer=None, gamma=1e-4):
         super().__init__()
         self.lcls = lcls
@@ -44,8 +44,36 @@ class CompressionAnnilation(nn.Module):
 
         # derivative, props = CKA_derivative(X, P)
         # return X + derivative, props
+        # return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X, props
+        return X + self.gamma * P @ P.T @ X
+
+
+class Annihilation(nn.Module):
+    def __init__(self, lcls, layer=None, gamma=1e-4):
+        super().__init__()
+        self.lcls = lcls
+        self.layer = layer
+
+        self.alpha = 1.0
+
+        self.register_buffer("gamma", torch.tensor(gamma))
+        self.register_buffer("running_cov", torch.zeros(1))
+
+    def forward(self, X):
         props = {"lc": self.gamma, "rc": self.gamma}
-        return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X, props
+
+        W = X.T @ X
+
+        if self.training:
+            if self.running_cov.shape[0] == 1:
+                self.running_cov = W.clone().detach()
+            # print(self.running_cov.shape, W.shape)
+            self.running_cov = (
+                self.alpha * self.running_cov + (1 - self.alpha) * W.detach()
+            )
+
+        X = X - self.gamma * X @ self.running_cov
+        return X, props
 
 
 class CKAFormer(nn.Module):
@@ -57,7 +85,11 @@ class CKAFormer(nn.Module):
             self.layers.append(
                 nn.Sequential(
                     LayerNorm(),
-                    CompressionAnnilation(
+                    Compression(
+                        self.lcls,
+                        layer=i,
+                    ),
+                    Annihilation(
                         self.lcls,
                         layer=i,
                     ),

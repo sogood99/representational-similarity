@@ -16,7 +16,7 @@ import numpy as np
 
 
 def test_ckaformer():
-    writer = SummaryWriter(log_dir="runs/ckaformer_new_scalar")
+    writer = SummaryWriter(log_dir="runs/ckaformer_running_cov")
 
     fig, ax = plt.subplots()
 
@@ -81,6 +81,7 @@ def test_ckaformer():
         plt.show()
     else:
         for epoch in range(100):
+            model.train()
             optimizer.zero_grad()
             out, stats = model(X)
             loss = criterion(out, y)
@@ -96,6 +97,7 @@ def test_ckaformer():
                 writer.add_scalar("Stats/rc", np.mean(stats["rc"]), epoch)
 
             if epoch % 10 == 0:
+                model.eval()
                 with torch.no_grad():
                     out_test, _ = model(X_test)
                     loss_test = criterion(out_test, y_test)
