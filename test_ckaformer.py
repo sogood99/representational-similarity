@@ -16,7 +16,7 @@ import numpy as np
 
 
 def test_ckaformer():
-    writer = SummaryWriter(log_dir="runs/ckaformer_running_cov")
+    writer = SummaryWriter(log_dir="runs/ckaformer")
 
     fig, ax = plt.subplots()
 
@@ -24,20 +24,27 @@ def test_ckaformer():
     d = 784
     classes = 10
 
-    dataset = torchvision.datasets.MNIST(
+    train_dataset = torchvision.datasets.MNIST(
         root="./dataset",
         train=True,
         download=True,
         transform=torchvision.transforms.ToTensor(),
     )
-    X = dataset.data[:n].view(n, -1).float()
-    # X = X / X.norm(dim=-1, keepdim=True)
-    y = dataset.targets[:n]
+    test_dataset = torchvision.datasets.MNIST(
+        root="./dataset",
+        train=False,
+        download=True,
+        transform=torchvision.transforms.ToTensor(),
+    )
 
-    X_test = dataset.data[n : n + 100].view(100, -1).float()
-    y_test = dataset.targets[n : n + 100]
+    train_dataloader = torch.utils.data.DataLoader(
+        dataset=train_dataset, batch_size=64, shuffle=True
+    )
+    test_dataloader = torch.utils.data.DataLoader(
+        dataset=test_dataset, batch_size=64, shuffle=False
+    )
 
-    model = CKAFormer(dim=d, depth=500, out_dim=classes)
+    model = CKAFormer(dim=d, depth=16, out_dim=classes)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
@@ -80,30 +87,39 @@ def test_ckaformer():
         ani = animation.FuncAnimation(fig, update, frames=100, interval=100)
         plt.show()
     else:
-        for epoch in range(100):
-            model.train()
-            optimizer.zero_grad()
-            out, stats = model(X)
-            loss = criterion(out, y)
-            loss.backward()
-            optimizer.step()
-            print(loss.item())
-            writer.add_scalar("Loss/train", loss.item(), epoch)
-            with torch.no_grad():
-                acc = (out.argmax(dim=-1) == y).float().mean()
-                print("Acc", acc.item())
-                writer.add_scalar("Acc/train", acc, epoch)
-                writer.add_scalar("Stats/lc", np.mean(stats["lc"]), epoch)
-                writer.add_scalar("Stats/rc", np.mean(stats["rc"]), epoch)
-
-            if epoch % 10 == 0:
-                model.eval()
+        global_step = 0
+        for epoch in range(10):
+            mean_loss = 0
+            mean_acc = 0
+            for X, y in train_dataloader:
+                optimizer.zero_grad()
+                out, stats = model(X.view(X.shape[0], -1))
+                loss = criterion(out, y)
+                loss.backward()
+                optimizer.step()
                 with torch.no_grad():
-                    out_test, _ = model(X_test)
-                    loss_test = criterion(out_test, y_test)
-                    writer.add_scalar("Loss/test", loss_test, epoch)
-                    acc_test = (out_test.argmax(dim=-1) == y_test).float().mean()
-                    writer.add_scalar("Acc/test", acc_test, epoch)
+                    acc = (out.argmax(dim=-1) == y).float().mean()
+                    mean_loss += loss.item()
+                    mean_acc += acc.item()
+                writer.add_scalar("Loss/train", loss.item(), global_step)
+                writer.add_scalar("Acc/train", acc.item(), global_step)
+                if global_step % 10 == 0:
+                    model.eval()
+                    mean_loss = 0
+                    mean_acc = 0
+                    for X, y in test_dataloader:
+                        out, _ = model(X.view(X.shape[0], -1))
+                        loss = criterion(out, y)
+                        acc = (out.argmax(dim=-1) == y).float().mean()
+                        mean_loss += loss.item()
+                        mean_acc += acc.item()
+                    mean_loss /= len(test_dataloader)
+                    mean_acc /= len(test_dataloader)
+                    writer.add_scalar("Loss/test", mean_loss, global_step)
+                    writer.add_scalar("Acc/test", mean_acc, global_step)
+                global_step += 1
+            mean_loss /= len(train_dataloader)
+            mean_acc /= len(train_dataloader)
 
 
 if __name__ == "__main__":

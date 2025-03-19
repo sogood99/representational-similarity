@@ -31,30 +31,41 @@ class FeedForwardClassifier(nn.Module):
 
 
 class Compression(nn.Module):
-    def __init__(self, lcls, layer=None, gamma=1e-4):
+    def __init__(self, embed_dim=784, layer=None, gamma=1e-4):
         super().__init__()
-        self.lcls = lcls
         self.softmax = nn.Softmax(dim=-1)
         self.gamma = gamma
         self.layer = layer
 
+        self.W_qk = nn.Linear(embed_dim, embed_dim, bias=False)
+        # self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+
     def forward(self, X):
-        P = self.lcls(X)
-        P = self.softmax(P)
+        # P = self.lcls(X)
+        # P = self.softmax(P)
 
         # derivative, props = CKA_derivative(X, P)
         # return X + derivative, props
         # return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X, props
-        return X + self.gamma * P @ P.T @ X
+        # return X + self.gamma * P @ P.T @ X
+
+        Q = self.W_qk(X)
+        K = self.W_qk(X)
+        # V = self.W_v(X)
+        V = X
+
+        attn_score = (Q @ K.T) / (Q.shape[-1] ** 0.5)
+        attn = self.softmax(attn_score)
+
+        return X + self.gamma * attn @ V
 
 
 class Annihilation(nn.Module):
-    def __init__(self, lcls, layer=None, gamma=1e-4):
+    def __init__(self, layer=None, gamma=1e-4):
         super().__init__()
-        self.lcls = lcls
         self.layer = layer
 
-        self.alpha = 1.0
+        self.alpha = 0.9
 
         self.register_buffer("gamma", torch.tensor(gamma))
         self.register_buffer("running_cov", torch.zeros(1))
@@ -79,29 +90,27 @@ class Annihilation(nn.Module):
 class CKAFormer(nn.Module):
     def __init__(self, dim, depth, out_dim):
         super().__init__()
-        self.lcls = FeedForwardClassifier(dim, out_dim)
         self.layers = nn.ModuleList([])
         for i in range(depth):
             self.layers.append(
                 nn.Sequential(
                     LayerNorm(),
                     Compression(
-                        self.lcls,
                         layer=i,
                     ),
                     Annihilation(
-                        self.lcls,
                         layer=i,
                     ),
                 )
             )
+        self.layers.append(FeedForwardClassifier(dim, out_dim))
         self.stats = {}
 
     def forward(self, X):
         self.stats["lc"] = []
         self.stats["rc"] = []
-        for layer in self.layers:
+        for layer in self.layers[:-1]:
             X, prop = layer(X)
             self.stats["lc"].append(prop["lc"])
             self.stats["rc"].append(prop["rc"])
-        return self.lcls(X), self.stats
+        return self.layers[-1](X), self.stats
