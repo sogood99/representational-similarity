@@ -31,33 +31,24 @@ class FeedForwardClassifier(nn.Module):
 
 
 class Compression(nn.Module):
-    def __init__(self, embed_dim=784, layer=None, gamma=1e-4):
+    def __init__(self, dim, num_classes, layer=None, gamma=1e-4):
         super().__init__()
-        self.softmax = nn.Softmax(dim=-1)
-        self.gamma = gamma
         self.layer = layer
 
-        self.W_qk = nn.Linear(embed_dim, embed_dim, bias=False)
-        # self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.weighted_means = nn.Linear(dim, num_classes)
+        self.gamma = gamma
+        self.num_classes = num_classes
+
+        self.softmax = nn.Softmax(dim=-1)
+        self.fn = nn.Linear(dim, num_classes)
 
     def forward(self, X):
-        # P = self.lcls(X)
-        # P = self.softmax(P)
 
-        # derivative, props = CKA_derivative(X, P)
-        # return X + derivative, props
-        # return X + self.gamma * P @ P.T @ X - self.gamma * X @ X.T @ X, props
-        # return X + self.gamma * P @ P.T @ X
+        P = self.softmax(self.fn(X))
+        W = self.weighted_means.weight
+        X = X - self.gamma * self.num_classes * P @ W
 
-        Q = self.W_qk(X)
-        K = self.W_qk(X)
-        # V = self.W_v(X)
-        V = X
-
-        attn_score = (Q @ K.T) / (Q.shape[-1] ** 0.5)
-        attn = self.softmax(attn_score)
-
-        return X + self.gamma * attn @ V
+        return X
 
 
 class Annihilation(nn.Module):
@@ -78,7 +69,6 @@ class Annihilation(nn.Module):
         if self.training:
             if self.running_cov.shape[0] == 1:
                 self.running_cov = W.clone().detach()
-            # print(self.running_cov.shape, W.shape)
             self.running_cov = (
                 self.alpha * self.running_cov + (1 - self.alpha) * W.detach()
             )
@@ -88,7 +78,7 @@ class Annihilation(nn.Module):
 
 
 class CKAFormer(nn.Module):
-    def __init__(self, dim, depth, out_dim):
+    def __init__(self, dim, depth, out_dim, num_classes):
         super().__init__()
         self.layers = nn.ModuleList([])
         for i in range(depth):
@@ -96,6 +86,8 @@ class CKAFormer(nn.Module):
                 nn.Sequential(
                     LayerNorm(),
                     Compression(
+                        num_classes=num_classes,
+                        dim=dim,
                         layer=i,
                     ),
                     Annihilation(
