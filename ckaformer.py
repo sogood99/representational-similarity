@@ -46,7 +46,7 @@ class Compression(nn.Module):
 
         P = self.softmax(self.fn(X))
         W = self.weighted_means.weight
-        X = X - self.gamma * self.num_classes * P @ W
+        X = X + self.gamma * self.num_classes * P @ W
 
         return X
 
