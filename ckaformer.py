@@ -35,18 +35,26 @@ class Compression(nn.Module):
         super().__init__()
         self.layer = layer
 
-        self.weighted_means = nn.Linear(dim, num_classes)
+        self.register_buffer("weighted_means", torch.zeros(num_classes, dim))
+
         self.gamma = gamma
         self.num_classes = num_classes
 
         self.softmax = nn.Softmax(dim=-1)
         self.fn = nn.Linear(dim, num_classes)
 
+        self.alpha = 0.9
+
     def forward(self, X):
 
         P = self.softmax(self.fn(X))
-        W = self.weighted_means.weight
-        X = X + self.gamma * self.num_classes * P @ W
+        if self.train:
+            current_mean = (P.T @ X).detach() / X.shape[0]
+            self.weighted_means = self.weighted_means * (self.alpha) + current_mean * (
+                1 - self.alpha
+            )
+        W = self.weighted_means
+        X = X + self.gamma * P @ W
 
         return X
 
@@ -64,9 +72,8 @@ class Annihilation(nn.Module):
     def forward(self, X):
         props = {"lc": self.gamma, "rc": self.gamma}
 
-        W = X.T @ X
-
         if self.training:
+            W = X.T @ X / X.shape[0]
             if self.running_cov.shape[0] == 1:
                 self.running_cov = W.clone().detach()
             self.running_cov = (
