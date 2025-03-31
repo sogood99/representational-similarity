@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import matplotlib.cm
 
 import sys
 
@@ -22,9 +21,9 @@ def test_ckaformer():
     n = 500
     d = 784
     classes = 10
-    gamma = 1e-5
-    depth = 64
-    trainable_mean = False
+    gamma = 1e-4
+    depth = 32
+    trainable_mean = True
 
     writer = SummaryWriter(
         log_dir="runs/ckaformer_{}_{}_{}".format(

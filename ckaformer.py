@@ -35,12 +35,10 @@ class Compression(nn.Module):
         super().__init__()
         self.layer = layer
 
-        if trainable_mean:
+        if not trainable_mean:
             self.register_buffer("weighted_means", torch.zeros(num_classes, dim))
         else:
-            self.weighted_means = nn.Parameter(
-                torch.zeros(num_classes, dim), requires_grad=False
-            )
+            self.weighted_means = nn.Linear(num_classes, dim, bias=False)
 
         self.gamma = gamma
         self.num_classes = num_classes
@@ -49,21 +47,30 @@ class Compression(nn.Module):
         self.fn = nn.Linear(dim, num_classes)
 
         self.alpha = 0.9
+        self.trainable_mean = trainable_mean
 
         self.init = False
 
     def forward(self, X):
 
         P = self.softmax(self.fn(X))
-        if self.train and self.trainable_mean:
+        if self.train and not self.trainable_mean:
             current_mean = (P.T @ X).detach() / X.shape[0]
             self.weighted_means = self.weighted_means * (self.alpha) + current_mean * (
                 1 - self.alpha
             )
         elif self.train and not self.init:
-            self.weighted_means = (P.T @ X).detach() / X.shape[0]
+            # self.weighted_means.weight = (P.T @ X).detach() / X.shape[0]
+            self.weighted_means.weight = nn.Parameter(
+                (P.T @ X).detach() / X.shape[0], requires_grad=True
+            )
+            self.init = True
 
-        W = self.weighted_means.weight
+        if self.trainable_mean:
+            W = self.weighted_means.weight
+        else:
+            W = self.weighted_means
+
         X = X + self.gamma * P @ W
 
         return X
