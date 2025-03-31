@@ -85,7 +85,7 @@ class Annihilation(nn.Module):
 
 
 class CKAFormer(nn.Module):
-    def __init__(self, dim, depth, out_dim, num_classes):
+    def __init__(self, dim, depth, out_dim, num_classes, gamma=1e-4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for i in range(depth):
@@ -96,9 +96,11 @@ class CKAFormer(nn.Module):
                         num_classes=num_classes,
                         dim=dim,
                         layer=i,
+                        gamma=gamma,
                     ),
                     Annihilation(
                         layer=i,
+                        gamma=gamma,
                     ),
                 )
             )

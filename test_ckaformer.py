@@ -16,7 +16,7 @@ import numpy as np
 
 
 def test_ckaformer():
-    writer = SummaryWriter(log_dir="runs/ckaformer_no_class")
+    writer = SummaryWriter(log_dir="runs/ckaformer_1e-5_64")
 
     fig, ax = plt.subplots()
 
@@ -44,7 +44,7 @@ def test_ckaformer():
         dataset=test_dataset, batch_size=64, shuffle=False
     )
 
-    model = CKAFormer(dim=d, depth=16, out_dim=classes, num_classes=classes)
+    model = CKAFormer(dim=d, depth=64, out_dim=classes, num_classes=classes, gamma=1e-5)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
