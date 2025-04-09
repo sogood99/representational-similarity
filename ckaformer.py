@@ -5,8 +5,6 @@ from torch.nn import functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from cka import CKA_derivative
-
 
 class LayerNorm(nn.Module):
 
@@ -85,7 +83,7 @@ class Annihilation(nn.Module):
 
 
 class CKAFormer(nn.Module):
-    def __init__(self, dim, depth, out_dim, num_classes, gamma=1e-4):
+    def __init__(self, dim, depth, out_dim, num_classes, gamma=1e-4, save_hidden=False):
         super().__init__()
         self.layers = nn.ModuleList([])
         for i in range(depth):
@@ -106,12 +104,20 @@ class CKAFormer(nn.Module):
             )
         self.layers.append(FeedForwardClassifier(dim, out_dim))
         self.stats = {}
+        self.save_hidden = save_hidden
 
     def forward(self, X):
         self.stats["lc"] = []
         self.stats["rc"] = []
+
+        if self.save_hidden:
+            self.stats["hidden"] = []
+
         for layer in self.layers[:-1]:
             X, prop = layer(X)
+
+            if self.save_hidden:
+                self.stats["hidden"].append(X)
             self.stats["lc"].append(prop["lc"])
             self.stats["rc"].append(prop["rc"])
         return self.layers[-1](X), self.stats
