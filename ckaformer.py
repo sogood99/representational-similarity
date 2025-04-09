@@ -144,7 +144,7 @@ class CKAFormer(nn.Module):
             X, prop = layer(X)
 
             if self.save_hidden:
-                self.stats["hidden"].append(X)
+                self.stats["hidden"].append(X.clone().detach())
             self.stats["lc"].append(prop["lc"])
             self.stats["rc"].append(prop["rc"])
 

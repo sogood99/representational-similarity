@@ -199,7 +199,11 @@ def test_ckaformer():
             if global_step % 50 == 0:
                 model.eval()
                 with torch.no_grad():
+                    import torch.nn.functional as F
+
                     X_vis, y_vis = next(iter(test_dataloader))
+                    print(y_vis)
+                    y_vis = F.one_hot(y_vis, num_classes=classes)
                     X_vis_flat = X_vis.view(X_vis.shape[0], -1)
                     out_vis, stats_vis = model(X_vis_flat)
                     print(stats_vis["hidden"][0].shape)
