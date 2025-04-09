@@ -120,4 +120,8 @@ class CKAFormer(nn.Module):
                 self.stats["hidden"].append(X)
             self.stats["lc"].append(prop["lc"])
             self.stats["rc"].append(prop["rc"])
-        return self.layers[-1](X), self.stats
+
+        output = self.layers[-1](X)
+        if self.save_hidden:
+            self.stats["hidden"].append(output)
+        return output, self.stats

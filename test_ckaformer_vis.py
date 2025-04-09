@@ -11,7 +11,68 @@ from ckaformer import CKAFormer
 from repsim import AngularCKA
 from repsim.stats import ManifoldPCA
 
+from sklearn.manifold import MDS
+from sklearn.decomposition import PCA
+
 # === PCA Visualization ===
+
+
+def low_d_vis_1(hiddens: dict[str, torch.Tensor], metric, n_dim_mds=5, n_dim_pca=3):
+    # First, embed all matrices of neural activity as 'points' in the metric space
+    points = {k: metric.neural_data_to_point(x) for k, x in hiddens.items()}
+
+    print(points.keys())
+
+    # Second, compute pairwise distances
+    pair_dist = torch.zeros(len(hiddens), len(hiddens))
+    for i, p_i in enumerate(points.values()):
+        for j, p_j in enumerate(points.values()):
+            # The 'length' computation happens on-device (cuda), so we'll grab
+            # the scalar result back to CPU with 'Tensor.item()'
+            pair_dist[i, j] = metric.length(p_i, p_j).item()
+
+    # Third, use MDS to find a Euclidean embedding of these pairwise distances
+    mds = MDS(n_components=n_dim_mds, metric=True, dissimilarity="precomputed")
+    mds_embedding = mds.fit_transform(pair_dist)
+
+    # Fourth, use PCA to further reduce
+    pcs = PCA(n_components=n_dim_pca).fit_transform(mds_embedding)
+
+    # Determine indices into the rows of 'pcs' to plot
+    idx_targets = list(hiddens.keys()).index("labels") if "labels" in hiddens else None
+    idx_input = list(hiddens.keys()).index("inputs") if "inputs" in hiddens else None
+    path_indices = [i for i in range(len(hiddens)) if i not in (idx_input, idx_targets)]
+    if idx_input is not None:
+        path_indices = [idx_input] + path_indices
+
+    # Plot grid
+    vmin, vmax = pcs.min(), pcs.max()
+    vmin, vmax = (vmin + vmax) / 2 - (vmax - vmin) * 5 / 8, (vmin + vmax) / 2 + (
+        vmax - vmin
+    ) * 5 / 8
+    fig, ax = plt.subplots(
+        n_dim_pca, n_dim_pca, figsize=(n_dim_pca * 2.5, n_dim_pca * 2.5)
+    )
+    for i, pc_i in enumerate(pcs.T):
+        for j, pc_j in enumerate(pcs.T):
+            if j >= i:
+                ax[i, j].remove()
+                continue
+
+            ax[i, j].plot(pc_j[path_indices], pc_i[path_indices], marker=".")
+            if idx_input is not None:
+                ax[i, j].plot(pc_j[idx_input], pc_i[idx_input], color="k", marker="s")
+            if idx_targets is not None:
+                ax[i, j].plot(
+                    pc_j[idx_targets], pc_i[idx_targets], color="m", marker="*"
+                )
+            ax[i, j].set_xlim([vmin, vmax])
+            ax[i, j].set_ylim([vmin, vmax])
+            ax[i, j].set_xlabel(f"PC {j+1}")
+            ax[i, j].set_ylabel(f"PC {i+1}")
+            ax[i, j].grid()
+    fig.tight_layout()
+    return fig
 
 
 def low_d_vis_2(hiddens: dict[str, torch.Tensor], metric, n_dim_pca=3):
@@ -144,18 +205,16 @@ def test_ckaformer():
                     print(stats_vis["hidden"][0].shape)
 
                     # Convert list of hidden activations to dict
-                    hiddens = {
-                        f"layer{i}": t.float()
-                        for i, t in enumerate(stats_vis["hidden"])
-                    }
+                    hiddens = {}
                     hiddens["inputs"] = X_vis_flat.float()
+                    for i, t in enumerate(stats_vis["hidden"]):
+                        hiddens[f"layer{i}"] = t.float()
                     hiddens["labels"] = y_vis.float()
 
                     # Use the first hidden layer to initialize the metric
-                    example_layer = hiddens["layer0"]
                     metric = AngularCKA(m=64)
 
-                    fig = low_d_vis_2(hiddens, metric, n_dim_pca=3)
+                    fig = low_d_vis_1(hiddens, metric, n_dim_pca=3)
                     fig.savefig(f"pca_vis/step_{global_step}.png")
                     plt.close(fig)
                 model.train()
