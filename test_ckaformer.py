@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import matplotlib.cm
 
 import sys
 
@@ -16,13 +15,21 @@ import numpy as np
 
 
 def test_ckaformer():
-    writer = SummaryWriter(log_dir="runs/ckaformer_1e-5_64")
 
     fig, ax = plt.subplots()
 
     n = 500
     d = 784
     classes = 10
+    gamma = 1e-4
+    depth = 32
+    trainable_mean = True
+
+    writer = SummaryWriter(
+        log_dir="runs/ckaformer_{}_{}_{}".format(
+            gamma, depth, "trainable" if trainable_mean else "fixed"
+        )
+    )
 
     train_dataset = torchvision.datasets.MNIST(
         root="./dataset",
@@ -44,7 +51,14 @@ def test_ckaformer():
         dataset=test_dataset, batch_size=64, shuffle=False
     )
 
-    model = CKAFormer(dim=d, depth=64, out_dim=classes, num_classes=classes, gamma=1e-5)
+    model = CKAFormer(
+        dim=d,
+        depth=depth,
+        out_dim=classes,
+        num_classes=classes,
+        trainable_mean=trainable_mean,
+        gamma=gamma,
+    )
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)

@@ -29,11 +29,14 @@ class FeedForwardClassifier(nn.Module):
 
 
 class Compression(nn.Module):
-    def __init__(self, dim, num_classes, layer=None, gamma=1e-4):
+    def __init__(self, dim, num_classes, layer=None, gamma=1e-4, trainable_mean=False):
         super().__init__()
         self.layer = layer
 
-        self.register_buffer("weighted_means", torch.zeros(num_classes, dim))
+        if not trainable_mean:
+            self.register_buffer("weighted_means", torch.zeros(num_classes, dim))
+        else:
+            self.weighted_means = nn.Linear(num_classes, dim, bias=False)
 
         self.gamma = gamma
         self.num_classes = num_classes
@@ -42,16 +45,30 @@ class Compression(nn.Module):
         self.fn = nn.Linear(dim, num_classes)
 
         self.alpha = 0.9
+        self.trainable_mean = trainable_mean
+
+        self.init = False
 
     def forward(self, X):
 
         P = self.softmax(self.fn(X))
-        if self.train:
+        if self.train and not self.trainable_mean:
             current_mean = (P.T @ X).detach() / X.shape[0]
             self.weighted_means = self.weighted_means * (self.alpha) + current_mean * (
                 1 - self.alpha
             )
-        W = self.weighted_means
+        elif self.train and not self.init:
+            # self.weighted_means.weight = (P.T @ X).detach() / X.shape[0]
+            self.weighted_means.weight = nn.Parameter(
+                (P.T @ X).detach() / X.shape[0], requires_grad=True
+            )
+            self.init = True
+
+        if self.trainable_mean:
+            W = self.weighted_means.weight
+        else:
+            W = self.weighted_means
+
         X = X + self.gamma * P @ W
 
         return X
@@ -83,7 +100,16 @@ class Annihilation(nn.Module):
 
 
 class CKAFormer(nn.Module):
-    def __init__(self, dim, depth, out_dim, num_classes, gamma=1e-4, save_hidden=False):
+    def __init__(
+        self,
+        dim,
+        depth,
+        out_dim,
+        num_classes,
+        trainable_mean=False,
+        gamma=1e-4,
+        save_hidden=False,
+    ):
         super().__init__()
         self.layers = nn.ModuleList([])
         for i in range(depth):
@@ -95,6 +121,7 @@ class CKAFormer(nn.Module):
                         dim=dim,
                         layer=i,
                         gamma=gamma,
+                        trainable_mean=trainable_mean,
                     ),
                     Annihilation(
                         layer=i,
