@@ -202,7 +202,12 @@ def test_ckaformer():
                     import torch.nn.functional as F
 
                     X_vis, y_vis = next(iter(test_dataloader))
-                    print(y_vis)
+                    # concatenate the batch
+                    for i in range(1, 20):
+                        tX_vis, ty_vis = next(iter(test_dataloader))
+                        X_vis = torch.cat((X_vis, tX_vis), dim=0)
+                        y_vis = torch.cat((y_vis, ty_vis), dim=0)
+
                     y_vis = F.one_hot(y_vis, num_classes=classes)
                     X_vis_flat = X_vis.view(X_vis.shape[0], -1)
                     out_vis, stats_vis = model(X_vis_flat)
@@ -216,7 +221,7 @@ def test_ckaformer():
                     hiddens["labels"] = y_vis.float()
 
                     # Use the first hidden layer to initialize the metric
-                    metric = AngularCKA(m=64)
+                    metric = AngularCKA(m=640 * 2)
 
                     fig = low_d_vis_1(hiddens, metric, n_dim_pca=3)
                     fig.savefig(f"pca_vis/step_{global_step}.png")
