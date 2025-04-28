@@ -1,32 +1,21 @@
-from ckaformer import CKAFormer
 import torch
-from torch import nn
 import torchvision
-
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import trange
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
-import sys
+from ckaformer import CKAFormer
 
 
-import numpy as np
-
-
-def test_ckaformer():
-
-    fig, ax = plt.subplots()
-
-    n = 500
-    d = 784
-    classes = 10
-    gamma = 1e-4
-    depth = 32
-    trainable_mean = True
-
+def test_ckaformer(
+        d: int = 784,
+        classes: int = 10,
+        gamma: float = 1e-4,
+        depth: int = 32,
+        trainable_mean: bool = True,
+):
     writer = SummaryWriter(
-        log_dir="runs/ckaformer_{}_{}_{}".format(
+        log_dir="debug-runs/ckaformer_{}_{}_{}".format(
             gamma, depth, "trainable" if trainable_mean else "fixed"
         )
     )
@@ -45,10 +34,10 @@ def test_ckaformer():
     )
 
     train_dataloader = torch.utils.data.DataLoader(
-        dataset=train_dataset, batch_size=64, shuffle=True
+        dataset=train_dataset, batch_size=250, shuffle=True
     )
     test_dataloader = torch.utils.data.DataLoader(
-        dataset=test_dataset, batch_size=64, shuffle=False
+        dataset=test_dataset, batch_size=250, shuffle=False
     )
 
     model = CKAFormer(
@@ -63,78 +52,57 @@ def test_ckaformer():
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 
-    if len(sys.argv) > 1:
-        losses = []
+    model.train()
 
-        origin = np.zeros((d, n))
-
-        colors = plt.cm.get_cmap("tab10")
-
-        quiver = ax.quiver(
-            *origin,
-            X[:, 0],
-            X[:, 1],
-            color=colors(y.cpu().numpy()),
-            angles="xy",
-            scale_units="xy",
-            scale=1,
-        )
-        ax.set_xlim(-2, 2)
-        ax.set_ylim(-2, 2)
-
-        def update(frame):
+    global_step = 0
+    for epoch in trange(10, desc="Epochs"):
+        mean_loss = 0
+        mean_acc = 0
+        for X, y in train_dataloader:
             optimizer.zero_grad()
-            new_X, out = model(X)
-            loss = criterion(out, y)
-            loss.backward()
+            all_logits, stats = model(X.flatten(start_dim=1))
+            layerwise_loss = {
+                "Loss/train/layer{}".format(i): criterion(logits, y)
+                for i, logits in enumerate(all_logits[:-1])
+            }
+            last_layer_out = all_logits[-1]
+            layerwise_loss["Loss/train"] = criterion(last_layer_out, y)
+
+            sum(layerwise_loss.values()).backward()
             optimizer.step()
-            losses.append(loss.item())
-
-            new_X = new_X.detach().cpu().numpy()
-
-            quiver.set_UVC(new_X[:, 0], new_X[:, 1])
-            print(loss.item())
 
             with torch.no_grad():
-                print("Acc", (out.argmax(dim=-1) == y).float().mean().item())
-
-        ani = animation.FuncAnimation(fig, update, frames=100, interval=100)
-        plt.show()
-    else:
-        global_step = 0
-        for epoch in range(10):
-            mean_loss = 0
-            mean_acc = 0
-            for X, y in train_dataloader:
-                optimizer.zero_grad()
-                out, stats = model(X.view(X.shape[0], -1))
-                loss = criterion(out, y)
-                loss.backward()
-                optimizer.step()
-                with torch.no_grad():
+                acc = (last_layer_out.argmax(dim=-1) == y).float().mean()
+                mean_loss += layerwise_loss["Loss/train"].item()
+                mean_acc += acc.item()
+            for key, val in layerwise_loss.items():
+                writer.add_scalar(key, val, global_step)
+            writer.add_scalar("Acc/train", acc.item(), global_step)
+            if global_step % 10 == 0:
+                model.eval()
+                mean_loss = 0
+                mean_acc = 0
+                for X, y in test_dataloader:
+                    all_logits, _ = model(X.view(X.shape[0], -1))
+                    out = all_logits[-1]
+                    loss = criterion(out, y)
                     acc = (out.argmax(dim=-1) == y).float().mean()
                     mean_loss += loss.item()
                     mean_acc += acc.item()
-                writer.add_scalar("Loss/train", loss.item(), global_step)
-                writer.add_scalar("Acc/train", acc.item(), global_step)
-                if global_step % 10 == 0:
-                    model.eval()
-                    mean_loss = 0
-                    mean_acc = 0
-                    for X, y in test_dataloader:
-                        out, _ = model(X.view(X.shape[0], -1))
-                        loss = criterion(out, y)
-                        acc = (out.argmax(dim=-1) == y).float().mean()
-                        mean_loss += loss.item()
-                        mean_acc += acc.item()
-                    mean_loss /= len(test_dataloader)
-                    mean_acc /= len(test_dataloader)
-                    writer.add_scalar("Loss/test", mean_loss, global_step)
-                    writer.add_scalar("Acc/test", mean_acc, global_step)
-                global_step += 1
-            mean_loss /= len(train_dataloader)
-            mean_acc /= len(train_dataloader)
+                mean_loss /= len(test_dataloader)
+                mean_acc /= len(test_dataloader)
+                writer.add_scalar("Loss/test", mean_loss, global_step)
+                writer.add_scalar("Acc/test", mean_acc, global_step)
+            global_step += 1
+        mean_loss /= len(train_dataloader)
+        mean_acc /= len(train_dataloader)
 
 
 if __name__ == "__main__":
-    test_ckaformer()
+    import jsonargparse
+
+    parser = jsonargparse.ArgumentParser()
+    parser.add_function_arguments(test_ckaformer)
+    args = parser.parse_args()
+
+    test_ckaformer(**args.as_dict())
