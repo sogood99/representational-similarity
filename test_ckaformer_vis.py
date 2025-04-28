@@ -1,18 +1,18 @@
 import os
 import sys
+
+import matplotlib.pyplot as plt
 import torch
 import torchvision
-import numpy as np
-import matplotlib.pyplot as plt
+from repsim import AngularCKA
+from repsim.stats import ManifoldPCA
+from sklearn.decomposition import PCA
+from sklearn.manifold import MDS
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from ckaformer import CKAFormer
-from repsim import AngularCKA
-from repsim.stats import ManifoldPCA
 
-from sklearn.manifold import MDS
-from sklearn.decomposition import PCA
 
 # === PCA Visualization ===
 
@@ -48,7 +48,7 @@ def low_d_vis_1(hiddens: dict[str, torch.Tensor], metric, n_dim_mds=5, n_dim_pca
     # Plot grid
     vmin, vmax = pcs.min(), pcs.max()
     vmin, vmax = (vmin + vmax) / 2 - (vmax - vmin) * 5 / 8, (vmin + vmax) / 2 + (
-        vmax - vmin
+            vmax - vmin
     ) * 5 / 8
     fig, ax = plt.subplots(
         n_dim_pca, n_dim_pca, figsize=(n_dim_pca * 2.5, n_dim_pca * 2.5)
@@ -68,8 +68,8 @@ def low_d_vis_1(hiddens: dict[str, torch.Tensor], metric, n_dim_mds=5, n_dim_pca
                 )
             ax[i, j].set_xlim([vmin, vmax])
             ax[i, j].set_ylim([vmin, vmax])
-            ax[i, j].set_xlabel(f"PC {j+1}")
-            ax[i, j].set_ylabel(f"PC {i+1}")
+            ax[i, j].set_xlabel(f"PC {j + 1}")
+            ax[i, j].set_ylabel(f"PC {i + 1}")
             ax[i, j].grid()
     fig.tight_layout()
     return fig
@@ -109,8 +109,8 @@ def low_d_vis_2(hiddens: dict[str, torch.Tensor], metric, n_dim_pca=3):
                 )
             ax[i, j].set_xlim([vmin, vmax])
             ax[i, j].set_ylim([vmin, vmax])
-            ax[i, j].set_xlabel(f"PC {j+1} (radians)")
-            ax[i, j].set_ylabel(f"PC {i+1} (radians)")
+            ax[i, j].set_xlabel(f"PC {j + 1} (radians)")
+            ax[i, j].set_ylabel(f"PC {i + 1} (radians)")
     fig.tight_layout()
     return fig
 
@@ -128,10 +128,10 @@ def test_ckaformer():
     # Load MNIST
     transform = torchvision.transforms.ToTensor()
     train_dataset = torchvision.datasets.MNIST(
-        root="./dataset", train=True, download=True, transform=transform
+        root="/data/datasets/mnist", train=True, transform=transform
     )
     test_dataset = torchvision.datasets.MNIST(
-        root="./dataset", train=False, download=True, transform=transform
+        root="/data/datasets/mnist", train=False, transform=transform
     )
 
     train_dataloader = torch.utils.data.DataLoader(
